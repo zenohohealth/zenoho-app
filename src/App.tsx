@@ -14,6 +14,7 @@ import { BillingPage } from './pages/BillingPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { AdminPage } from './pages/AdminPage';
+import { DebugPage } from './pages/DebugPage';
 import { TopNav } from './components/TopNav';
 import { BottomTabBar } from './components/BottomTabBar';
 import { Footer } from './components/Footer';
@@ -21,6 +22,8 @@ import { Footer } from './components/Footer';
 function AppShell() {
   const { session, profile, loading } = useAuth();
   const { route } = useRouter();
+
+  if (route === '/debug') return <DebugPage />;
 
   if (loading) {
     return (
