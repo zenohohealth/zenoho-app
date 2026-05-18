@@ -129,6 +129,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function toIntSafe(v: any): number | null {
+  if (v == null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
+  if (typeof v === "string") {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? Math.round(n) : null;
+  }
+  return null;
+}
+
+function toStringArray(v: any): string[] {
+  if (!v) return [];
+  if (!Array.isArray(v)) return [];
+  return v.map((item: any) => {
+    if (typeof item === "string") return item;
+    if (item && typeof item === "object") return item.rule_name ?? item.rule_id ?? item.name ?? JSON.stringify(item);
+    return String(item);
+  }).filter(Boolean);
+}
+
 function parseLabRefRange(range: string | null | undefined): { low: number | null; high: number | null } {
   if (!range || typeof range !== "string") return { low: null, high: null };
   const match = range.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
@@ -327,16 +347,18 @@ Deno.serve(async (req: Request) => {
       const { error: psErr } = await supabase.from("panel_scores").upsert({
         panel_id,
         user_id: userId,
-        b_score: panelScore.b_score ?? panelScore.zenoho_health_score,
-        b_score_confidence: panelScore.b_score_confidence ?? panelScore.confidence,
-        bio_age_estimated: bioAge?.biological_age ? Math.round(bioAge.biological_age) : null,
-        bio_age_chronological: bioAge?.chronological_age ?? null,
-        bio_age_gap: bioAge?.bio_age_gap ? Math.round(bioAge.bio_age_gap) : null,
-        bio_age_confidence: bioAge?.confidence ?? null,
-        top_lever: panelScore.top_lever ?? result.zenoho_read_summary?.top_3_opportunities?.[0] ?? null,
-        next_test_date: parseNextTestDate(result.zenoho_read_summary?.next_test_recommendation_days ?? result.zenoho_read_summary?.next_test_recommendation),
-        safety_overrides_active: panelScore.safety_overrides_active ?? panelScore.safety_override_active ?? false,
-        cross_marker_rules_active: (result.cross_marker_rules_triggered ?? []).map((r: any) => r.rule_name ?? r.rule_id).filter(Boolean),
+        b_score: toIntSafe(panelScore.zenoho_health_score ?? panelScore.b_score),
+        b_score_confidence: panelScore.confidence ?? panelScore.b_score_confidence ?? null,
+        bio_age_estimated: toIntSafe(bioAge?.biological_age ?? panelScore.bio_age_estimated),
+        bio_age_chronological: toIntSafe(bioAge?.chronological_age ?? panelScore.bio_age_chronological),
+        bio_age_gap: toIntSafe(bioAge?.bio_age_gap ?? panelScore.bio_age_gap),
+        bio_age_confidence: bioAge?.confidence ?? panelScore.bio_age_confidence ?? null,
+        top_lever: typeof (result.zenoho_read_summary?.top_3_opportunities?.[0] ?? panelScore.top_lever) === "string"
+          ? (result.zenoho_read_summary?.top_3_opportunities?.[0] ?? panelScore.top_lever)
+          : null,
+        next_test_date: parseNextTestDate(result.zenoho_read_summary?.next_test_recommendation_days ?? result.zenoho_read_summary?.next_test_recommendation ?? panelScore.next_test_date),
+        safety_overrides_active: Boolean(panelScore.safety_override_active ?? panelScore.safety_overrides_active ?? false),
+        cross_marker_rules_active: toStringArray(result.cross_marker_rules_triggered ?? panelScore.cross_marker_rules_active),
         created_at: now,
       }, { onConflict: "panel_id" });
       if (psErr) throw new Error(`panel_scores upsert: ${psErr.message}`);
@@ -349,13 +371,13 @@ Deno.serve(async (req: Request) => {
         supplement_name: s.supplement_name ?? s.name,
         tier: s.tier ?? 1,
         tier_label: s.tier_label,
-        dose_amount: s.dose_amount ?? null,
+        dose_amount: toIntSafe(s.dose_amount),
         dose_unit: s.dose_unit ?? null,
         dose_frequency: s.dose_frequency ?? null,
         dose_timing: s.dose_timing ?? s.timing ?? null,
         pair_with: s.pair_with,
         evidence_level: s.evidence_level,
-        trigger_marker_id: s.trigger_marker_id ?? null,
+        trigger_marker_id: toIntSafe(s.trigger_marker_id),
         trigger_zone: s.trigger_zone,
         drug_interaction_warning: s.drug_interaction_warning,
         is_premium_form: false,
