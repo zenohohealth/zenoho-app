@@ -283,15 +283,13 @@ Deno.serve(async (req: Request) => {
     }).eq("id", panel_id);
 
     if (markers.length) {
-      const validMarkers = markers.filter((m: any) =>
-        typeof m.marker_id === 'number' &&
-        m.marker_id >= 1 &&
-        m.marker_id <= 62
-      );
-
-      if (validMarkers.length < markers.length) {
-        console.log(`Filtered out ${markers.length - validMarkers.length} markers with marker_id outside 1-62 range`);
-      }
+      const validMarkers = markers.filter((m: any) => {
+        const valid = typeof m.marker_id === 'number' && Number.isInteger(m.marker_id) && m.marker_id >= 1 && m.marker_id <= 62;
+        if (!valid) {
+          console.log(`[marker_id filter] Skipped: ${m.marker_name ?? m.name ?? 'unknown'} (marker_id=${m.marker_id})`);
+        }
+        return valid;
+      });
 
       const markerRows = validMarkers.map((m: any) => {
         let lab_ref_low = m.lab_ref_low;
