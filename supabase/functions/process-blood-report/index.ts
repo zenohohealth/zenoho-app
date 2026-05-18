@@ -15,6 +15,8 @@ CRITICAL RULES:
 4. Trigger safety overrides immediately when critical thresholds are crossed.
 5. Apply cross-marker rules after individual scoring is complete.
 6. If a value is ambiguous or potentially a lab error, flag it — do not score it.
+7. Domain names in domain_scores[] MUST be chosen from this exact list, verbatim, with no substitutions: "Biological Age", "Vitality & Strength", "Brain Sharpness", "Heart Engine", "Metabolic Power", "Recovery Capacity", "Detox Efficiency", "Endurance & Stamina", "Mood & Calm", "Immunity Strength". If a domain cannot be computed (less than 40% of its constituent markers tested), omit it entirely — never substitute an alternative name.
+8. FORBIDDEN domain names: never output "Vitality & Energy", "Organ Resilience", "Metabolic Health", "Nutritional Sufficiency", "Inflammatory Load", "Cardiovascular Health", or any name outside the canonical list in rule 7.
 
 ==============================================================
 PART 1: LAB REPORT EXTRACTION
