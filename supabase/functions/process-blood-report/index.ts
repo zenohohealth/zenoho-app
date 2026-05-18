@@ -283,7 +283,17 @@ Deno.serve(async (req: Request) => {
     }).eq("id", panel_id);
 
     if (markers.length) {
-      const markerRows = markers.map((m: any) => {
+      const validMarkers = markers.filter((m: any) =>
+        typeof m.marker_id === 'number' &&
+        m.marker_id >= 1 &&
+        m.marker_id <= 62
+      );
+
+      if (validMarkers.length < markers.length) {
+        console.log(`Filtered out ${markers.length - validMarkers.length} markers with marker_id outside 1-62 range`);
+      }
+
+      const markerRows = validMarkers.map((m: any) => {
         let lab_ref_low = m.lab_ref_low;
         let lab_ref_high = m.lab_ref_high;
         if ((lab_ref_low == null || lab_ref_high == null) && m.lab_ref_range) {
