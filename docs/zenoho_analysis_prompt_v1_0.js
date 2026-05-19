@@ -1,6 +1,6 @@
 # ZENOHO BLOOD ANALYSIS SYSTEM PROMPT
 # Version: 1.0 | Based on: v1.1.5 marker registry + v1.0.1 performance domains
-# Usage: Pass as `system` parameter in Claude API call alongside blood report PDF
+# Usage: Pass as `system\` parameter in Claude API call alongside blood report PDF
 # Model: claude-sonnet-4-20250514
 # Max tokens: 8000 output
 
