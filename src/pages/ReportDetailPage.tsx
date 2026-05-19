@@ -50,7 +50,7 @@ type MarkerResult = {
 type Supplement = {
   id: string;
   supplement_name: string;
-  tier: number;
+  tier: number | null;
   tier_label: string | null;
   dose_amount: number | null;
   dose_unit: string | null;
@@ -62,9 +62,14 @@ type Supplement = {
   trigger_zone: string | null;
   drug_interaction_warning: string | null;
   is_premium_form: boolean;
-  premium_form_name: string | null;
-  ayurvedic_classical_name: string | null;
-  ayush_recognised: boolean;
+  // v1.2 fields
+  framework_indication: string | null;
+  indication_rationale: string | null;
+  physician_consultation_required: boolean;
+  standardization: string | null;
+  sourcing_note: string | null;
+  bioavailability_note: string | null;
+  safety_template_id: string | null;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -346,57 +351,108 @@ function TabDomains({ domains, markers, safetyActive }: { domains: DomainScore[]
 // ─── Tab 3: Protocol ──────────────────────────────────────────────────────────
 
 function SupplementCard({ s }: { s: Supplement }) {
+  const tierNum = parseTierFromLabel(s.tier_label) ?? s.tier;
+  const isAyush = tierNum === 3;
+
   return (
-    <div className="card p-4 space-y-2">
+    <div className="card p-4 space-y-2.5">
+      {/* Name + tier_label */}
       <div className="flex items-start justify-between gap-2">
-        <span className="font-semibold text-white text-sm">{s.supplement_name}</span>
-        {s.is_premium_form && s.premium_form_name && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/20 flex-shrink-0">
-            {s.premium_form_name}
+        <span className="font-semibold text-white text-sm leading-snug">{s.supplement_name}</span>
+        {s.tier_label && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
+            style={{
+              background: tierNum === 1 ? '#00E5CC18' : tierNum === 2 ? '#3B82F618' : '#F59E0B18',
+              color: tierNum === 1 ? '#00E5CC' : tierNum === 2 ? '#3B82F6' : '#F59E0B',
+            }}
+          >
+            {s.tier_label}
           </span>
         )}
       </div>
-      <div className="text-xs text-[#94A3B8]">
-        {[s.dose_amount && `${s.dose_amount}${s.dose_unit || ''}`, s.dose_frequency, s.dose_timing].filter(Boolean).join(' · ')}
-      </div>
+
+      {/* Standardization / dosing */}
+      {s.standardization ? (
+        <p className="text-xs text-[#94A3B8] leading-relaxed">{s.standardization}</p>
+      ) : (
+        <div className="text-xs text-[#94A3B8]">
+          {[s.dose_amount && `${s.dose_amount}${s.dose_unit || ''}`, s.dose_frequency, s.dose_timing].filter(Boolean).join(' · ')}
+        </div>
+      )}
+
+      {/* Indication rationale */}
+      {s.indication_rationale && (
+        <p className="text-xs text-[#64748B] leading-relaxed">{s.indication_rationale}</p>
+      )}
+
+      {/* Framework indication */}
+      {s.framework_indication && (
+        <div className="text-[10px] text-[#64748B]">
+          Indication: <span className="text-[#94A3B8]">{s.framework_indication}</span>
+        </div>
+      )}
+
+      {/* Pair with */}
       {s.pair_with && (
         <div className="text-xs text-[#64748B]">Pair with: <span className="text-[#94A3B8]">{s.pair_with}</span></div>
       )}
-      {s.ayurvedic_classical_name && (
-        <div className="text-xs text-[#64748B]">Classical name: <span className="text-[#94A3B8]">{s.ayurvedic_classical_name}</span></div>
-      )}
+
+      {/* Safety warning */}
       {s.drug_interaction_warning && (
         <div className="flex items-start gap-1.5 text-xs text-[#F59E0B] bg-[#F59E0B]/8 border border-[#F59E0B]/20 rounded-lg px-2.5 py-2">
           <AlertTriangle size={11} className="flex-shrink-0 mt-0.5" />
-          {s.drug_interaction_warning}
+          <span>{s.drug_interaction_warning}</span>
         </div>
       )}
-      {s.tier === 3 && (
-        <p className="text-[10px] text-[#64748B] italic">From classical Ayurvedic tradition. Discuss with your physician.</p>
+
+      {/* Physician consultation flag */}
+      {s.physician_consultation_required && (
+        <div className="text-[10px] text-[#64748B] bg-white/[0.03] border border-white/[0.06] rounded-lg px-2.5 py-1.5">
+          Discuss with your physician before starting this supplement.
+        </div>
+      )}
+
+      {/* Bioavailability note (Tier 3 only) */}
+      {s.bioavailability_note && (
+        <p className="text-[10px] text-[#64748B] italic leading-relaxed">{s.bioavailability_note}</p>
+      )}
+
+      {/* Sourcing note (Tier 3 only) */}
+      {isAyush && s.sourcing_note && (
+        <p className="text-[10px] text-[#64748B] leading-relaxed">{s.sourcing_note}</p>
       )}
     </div>
   );
 }
 
+function parseTierFromLabel(label: string | null): number | null {
+  if (!label) return null;
+  if (label.startsWith('Tier 1')) return 1;
+  if (label.startsWith('Tier 2')) return 2;
+  if (label.startsWith('Tier 3')) return 3;
+  return null;
+}
+
 function TabProtocol({ supplements }: { supplements: Supplement[] }) {
-  const tiers: [number, string, string][] = [
-    [1, 'Tier 1', 'Strong RCT Evidence'],
-    [2, 'Tier 2', 'Moderate RCT Evidence'],
-    [3, 'Tier 3', 'Classical Tradition — AYUSH Recognised'],
+  const tierDefs: [number, string, string, string][] = [
+    [1, 'Tier 1 — Strong evidence (Grade A)', 'Strong RCT Evidence', '#00E5CC'],
+    [2, 'Tier 2 — Moderate to strong evidence (Grade B)', 'Moderate to Strong Evidence', '#3B82F6'],
+    [3, 'Tier 3 — Traditional use, limited modern research', 'Classical Tradition — AYUSH', '#F59E0B'],
   ];
-  const tierColors: Record<number, string> = { 1: '#00E5CC', 2: '#A78BFA', 3: '#F59E0B' };
 
   return (
     <div className="space-y-8">
-      {tiers.map(([tier, label, desc]) => {
-        const group = supplements.filter(s => s.tier === tier);
+      {tierDefs.map(([tierNum, tierLabel, desc, color]) => {
+        const group = supplements.filter(s => {
+          const t = parseTierFromLabel(s.tier_label) ?? s.tier;
+          return t === tierNum;
+        });
         if (!group.length) return null;
-        const color = tierColors[tier];
         return (
-          <div key={tier}>
+          <div key={tierNum}>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-              <h4 className="font-semibold text-white text-sm">{label}</h4>
+              <h4 className="font-semibold text-white text-sm">{tierLabel}</h4>
               <span className="text-xs text-[#64748B]">— {desc}</span>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -410,7 +466,7 @@ function TabProtocol({ supplements }: { supplements: Supplement[] }) {
       )}
       <div className="px-4 py-3 rounded-xl bg-[#142447] border border-white/[0.06]">
         <p className="text-xs text-[#64748B] leading-relaxed">
-          <span className="text-white font-medium">Performance supplement recommendations, not prescriptions.</span> All recommendations are derived from your biomarker values and should be discussed with a licensed physician before use.
+          <span className="text-white font-medium">These are wellness supplement suggestions, not prescriptions.</span> All recommendations are derived from your biomarker values and should be discussed with a licensed physician before use.
         </p>
       </div>
     </div>
