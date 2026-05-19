@@ -217,6 +217,17 @@ Extract:
 
 Marker name normalization (examples — extend as needed):
   Haemoglobin / Hemoglobin / Hb / Hgb → Marker 1
+  RBC Count / Total RBC / Erythrocyte count → Marker 2
+  WBC / TLC / Total Leucocyte Count / Leukocytes → Marker 3
+  Platelet Count / PLT / Platelets / Thrombocyte count → Marker 4
+  Neutrophils / ANC / PMN / Polymorphs / Segs → Marker 5
+  Lymphocytes / ALC / Lymphs → Marker 6
+  Monocytes / Mono → Marker 7
+  Eosinophils / AEC → Marker 8
+  Basophils / Baso → Marker 9
+  Haematocrit / Hematocrit / HCT / PCV → Marker 10
+  MCV / Mean Corpuscular Volume → Marker 11
+  MCH / Mean Corpuscular Haemoglobin → Marker 12
   Vitamin D / 25-OH Vitamin D / 25(OH)D → Marker 36
   Vitamin B12 / Cobalamin → Marker 37
   HbA1c / Glycated Haemoglobin → Marker 14
@@ -251,18 +262,18 @@ Format: ID|SYSTEM|OPTIMAL_LOW|OPTIMAL_HIGH|WATCH_BELOW|WATCH_ABOVE|ALERT_BELOW|A
 SYSTEM CODES: BLD=Blood, GLU=Glucose, LVR=Liver, KDN=Kidney, LPD=Lipids,
               VIT=Vitamins, THY=Thyroid, IRN=Iron, INF=Inflammation, HRM=Hormones
 
-1|BLD|13.5|17.0|12.0|null|8.0|null|g/dL|Haemoglobin; Male optimal; Female: opt 13.0-15.5, watch <11.5, alert <8.0
-2|BLD|4.5|7.0|null|10.0|null|null|x10³/μL|WBC; u-curve: <2.5 also alert
-3|BLD|150|350|100|500|50|800|x10³/μL|Platelets
-4|BLD|2.0|6.5|1.5|7.5|1.0|null|x10³/μL|ANC absolute neutrophils
-5|BLD|1.5|3.5|1.0|4.5|0.8|null|x10³/μL|ALC absolute lymphocytes
-6|BLD|0.2|0.8|null|1.0|null|null|x10³/μL|Monocytes absolute
-7|BLD|0.03|0.35|null|0.5|null|null|x10³/μL|Eosinophils absolute
-8|BLD|0.00|0.08|null|0.12|null|null|x10³/μL|Basophils absolute
-9|BLD|88|95|83|null|75|null|fL|MCV; below 75 = microcytic alert
-10|BLD|28|31|26|null|24|null|pg|MCH
-11|BLD|38|45|36|null|34|null|%|Hematocrit; Male; Female opt 36-43
-12|BLD|11.5|13.5|null|14.5|null|null|%|RDW-CV; elevated = anisocytosis
+1|BLD|14.5|16.0|12.0|null|8.0|null|g/dL|Haemoglobin; Male opt 14.5-16.0; Female opt 13.0-15.5, watch <11.5, alert <8.0. Apply sex modifier.
+2|BLD|4.7|5.3|4.0|null|3.8|6.0|million/uL|RBC Count; Male opt 4.7-5.3; Female opt 4.2-4.7; alert <3.8 or >6.0. Apply sex modifier.
+3|BLD|4.5|7.0|null|10.0|null|11.0|x10³/μL|WBC; u-curve: <2.5 also alert; >11.0 alert
+4|BLD|200|300|100|450|50|800|x10³/μL|Platelets; Zenoho Optimal 200-300
+5|BLD|2.0|6.5|1.5|7.5|1.0|null|x10³/μL|ANC absolute neutrophils
+6|BLD|1.5|3.5|1.0|4.5|0.8|null|x10³/μL|ALC absolute lymphocytes
+7|BLD|0.2|0.8|null|1.0|null|null|x10³/μL|Monocytes absolute
+8|BLD|0.03|0.35|null|0.5|null|null|x10³/μL|Eosinophils absolute
+9|BLD|0.00|0.08|null|0.12|null|null|x10³/μL|Basophils absolute
+10|BLD|38|45|33|null|34|52|%|Hematocrit; Male opt 43-48 alert <35 or >52; Female opt 38-43 alert <33 or >48. Apply sex modifier.
+11|BLD|88|95|83|null|75|100|fL|MCV; below 75 = microcytic alert; above 100 = macrocytic alert
+12|BLD|28|31|26|null|24|null|pg|MCH
 13|GLU|75|88|70|100|60|126|mg/dL|Fasting glucose; ADA: >=100 in pre-diabetic range; >=126 in diabetic range
 14|GLU|4.8|5.4|null|5.7|null|6.5|%|HbA1c; ADA: 5.7-6.4 in pre-diabetic range; >=6.5 in diabetic range
 15|LVR|10|25|null|35|null|50|U/L|AST; Male watch >35, Female watch >30
