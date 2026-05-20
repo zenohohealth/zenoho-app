@@ -1372,8 +1372,10 @@ Deno.serve(async (req: Request) => {
         markers_available: s.markers_available,
         created_at: now,
       }));
-      const { error: sysErr } = await supabase.from("system_scores").insert(sysRows);
-      if (sysErr) throw new Error(`system_scores insert: ${sysErr.message}`);
+      const { error: sysErr } = await supabase
+        .from("system_scores")
+        .upsert(sysRows, { onConflict: "panel_id,system_id" });
+      if (sysErr) throw new Error(`system_scores upsert: ${sysErr.message}`);
     }
 
     if (domains.length) {
@@ -1387,8 +1389,10 @@ Deno.serve(async (req: Request) => {
         confidence: d.confidence,
         created_at: now,
       }));
-      const { error: domErr } = await supabase.from("domain_scores").insert(domRows);
-      if (domErr) throw new Error(`domain_scores insert: ${domErr.message}`);
+      const { error: domErr } = await supabase
+        .from("domain_scores")
+        .upsert(domRows, { onConflict: "panel_id,domain_id" });
+      if (domErr) throw new Error(`domain_scores upsert: ${domErr.message}`);
     }
 
     if (panelScore) {
