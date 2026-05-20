@@ -3,6 +3,7 @@ import { Upload, FileText, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../hooks/useRouter';
+import { useReportProgress } from '../context/ReportProgressContext';
 
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -11,6 +12,7 @@ let uploadInProgress = false;
 export function ReportUploadPage() {
   const { user } = useAuth();
   const { navigate } = useRouter();
+  const { startTracking } = useReportProgress();
 
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState('');
@@ -75,7 +77,8 @@ export function ReportUploadPage() {
         .maybeSingle();
 
       if (existing?.id) {
-        navigate(`/reports/processing/${existing.id}`);
+        startTracking(existing.id);
+        navigate('/dashboard');
         return;
       }
 
@@ -98,7 +101,9 @@ export function ReportUploadPage() {
         return;
       }
 
-      navigate(`/reports/processing/${panel.id}`);
+      uploadInProgress = false;
+      startTracking(panel.id);
+      navigate('/dashboard');
     } catch (err: any) {
       uploadInProgress = false;
       setUploadError(err.message ?? 'Unexpected error.');

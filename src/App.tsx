@@ -1,4 +1,5 @@
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ReportProgressProvider } from './context/ReportProgressContext';
 import { RouterProvider, useRouter } from './hooks/useRouter';
 import { AuthPage } from './pages/AuthPage';
 import { OnboardingPage } from './pages/OnboardingPage';
@@ -16,6 +17,7 @@ import { CommunityPage } from './pages/CommunityPage';
 import { AdminPage } from './pages/AdminPage';
 import { DebugPage } from './pages/DebugPage';
 import { TopNav } from './components/TopNav';
+import { AnalysisToastBar } from './components/AnalysisToastBar';
 import { BottomTabBar } from './components/BottomTabBar';
 import { Footer } from './components/Footer';
 
@@ -35,9 +37,6 @@ function AppShell() {
 
   if (!session) return <AuthPage />;
   if (!profile?.onboarded_at) return <OnboardingPage />;
-
-  // Processing screen needs full-screen — skip nav/footer
-  const isProcessing = route === '/reports/upload' || route.startsWith('/reports/processing/');
 
   const renderPage = () => {
     if (route === '/reports/upload') return <ReportUploadPage />;
@@ -60,13 +59,10 @@ function AppShell() {
     return <DashboardPage />;
   };
 
-  if (isProcessing) {
-    return renderPage();
-  }
-
   return (
     <div className="min-h-screen bg-[#0D1B35] flex flex-col">
       <TopNav />
+      <AnalysisToastBar />
       <main className="flex-1 w-full max-w-screen-xl mx-auto px-0 pb-16 md:pb-0">
         {renderPage()}
       </main>
@@ -80,7 +76,9 @@ function App() {
   return (
     <RouterProvider>
       <AuthProvider>
-        <AppShell />
+        <ReportProgressProvider>
+          <AppShell />
+        </ReportProgressProvider>
       </AuthProvider>
     </RouterProvider>
   );
