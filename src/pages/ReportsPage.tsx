@@ -6,6 +6,8 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from '../hooks/useRouter';
+import { useReportProgress } from '../context/ReportProgressContext';
+import { useElapsedProgress } from '../components/AnalysisToastBar';
 
 type PanelRow = {
   id: string;
@@ -19,21 +21,28 @@ type PanelRow = {
   bio_age_gap: number | null;
 };
 
-function StatusBadge({ status }: { status: string }) {
+// ── StatusBadge ───────────────────────────────────────────────────────────────
+
+function StatusBadge({ status, pct }: { status: string; pct?: number }) {
   if (status === 'complete') return null;
-  const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-    pending:      { label: 'Analysing...', cls: 'text-[#F59E0B] bg-[#F59E0B]/10', icon: <Clock size={11} /> },
-    processing:   { label: 'Analysing...', cls: 'text-[#F59E0B] bg-[#F59E0B]/10', icon: <Clock size={11} /> },
-    failed:       { label: 'Failed',        cls: 'text-[#EF4444] bg-[#EF4444]/10', icon: <AlertCircle size={11} /> },
-    needs_review: { label: 'Review',        cls: 'text-[#F59E0B] bg-[#F59E0B]/10', icon: <AlertCircle size={11} /> },
-  };
-  const s = map[status] ?? map['pending'];
+  const isAnalysing = status === 'pending' || status === 'processing';
+  const label = isAnalysing && pct !== undefined
+    ? `Analysing... ${Math.round(pct)}%`
+    : isAnalysing ? 'Analysing...'
+    : status === 'failed' ? 'Failed'
+    : 'Review';
+  const cls = status === 'failed'
+    ? 'text-[#EF4444] bg-[#EF4444]/10'
+    : 'text-[#F59E0B] bg-[#F59E0B]/10';
+  const icon = status === 'failed' ? <AlertCircle size={11} /> : <Clock size={11} />;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${s.cls}`}>
-      {s.icon}{s.label}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>
+      {icon}{label}
     </span>
   );
 }
+
+// ── BScoreDelta ───────────────────────────────────────────────────────────────
 
 function BScoreDelta({ current, prev }: { current: number | null; prev: number | null }) {
   if (current === null) return null;
@@ -51,6 +60,8 @@ function BScoreDelta({ current, prev }: { current: number | null; prev: number |
     </div>
   );
 }
+
+// ── DeleteModal ───────────────────────────────────────────────────────────────
 
 function DeleteModal({
   onConfirm,
@@ -93,6 +104,8 @@ function DeleteModal({
   );
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDone, 3000);
@@ -109,8 +122,9 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   );
 }
 
+// ── deletePanel ───────────────────────────────────────────────────────────────
+
 async function deletePanel(panelId: string) {
-  // Delete child rows in FK-safe order, then parent
   await supabase.from('supplement_recommendations').delete().eq('panel_id', panelId);
   await supabase.from('achievements').delete().eq('panel_id', panelId);
   await supabase.from('domain_scores').delete().eq('panel_id', panelId);
@@ -118,7 +132,6 @@ async function deletePanel(panelId: string) {
   await supabase.from('marker_results').delete().eq('panel_id', panelId);
   await supabase.from('panel_scores').delete().eq('panel_id', panelId);
 
-  // Fetch raw_pdf_path before deleting panel
   const { data: panel } = await supabase
     .from('panels')
     .select('raw_pdf_path')
@@ -127,15 +140,89 @@ async function deletePanel(panelId: string) {
 
   await supabase.from('panels').delete().eq('id', panelId);
 
-  // Best-effort storage cleanup
   if (panel?.raw_pdf_path) {
     await supabase.storage.from('blood-reports').remove([panel.raw_pdf_path]);
   }
 }
 
+// ── PanelCard ─────────────────────────────────────────────────────────────────
+
+function PanelCard({
+  p,
+  trackingStartedAt,
+  onRowClick,
+  onDelete,
+}: {
+  p: PanelRow;
+  trackingStartedAt: number | null;
+  onRowClick: (p: PanelRow) => void;
+  onDelete: (id: string) => void;
+}) {
+  const pct = useElapsedProgress(trackingStartedAt);
+  const isAnalysing = p.processing_status === 'pending' || p.processing_status === 'processing';
+
+  return (
+    <div className="card p-5 flex items-center gap-4 hover:border-white/15 transition-all duration-200 group relative overflow-hidden">
+      {/* Clickable content */}
+      <div
+        className="flex-1 min-w-0 cursor-pointer flex items-center gap-4"
+        onClick={() => onRowClick(p)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="font-medium text-white">{p.lab_name || 'Blood Report'}</span>
+            <StatusBadge
+              status={p.processing_status}
+              pct={isAnalysing && trackingStartedAt !== null ? pct : undefined}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#64748B]">
+            {(p.registered_at || p.created_at) && (
+              <span>Uploaded: {formatDateTime(p.registered_at ?? p.created_at!)}</span>
+            )}
+            <span>Test date: {formatTestDate(p.collected_on)}</span>
+            {p.bio_age_gap !== null && (
+              <span className={`font-medium ${p.bio_age_gap <= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                Bio age: {p.bio_age_gap <= 0 ? `${Math.abs(p.bio_age_gap)}y younger` : `${p.bio_age_gap}y older`}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <BScoreDelta current={p.b_score} prev={p.b_score_prev} />
+          <ArrowRight size={15} className="text-[#64748B] group-hover:text-white transition-colors" />
+        </div>
+      </div>
+
+      {/* Delete button */}
+      <button
+        onClick={e => { e.stopPropagation(); onDelete(p.id); }}
+        className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
+        aria-label="Delete report"
+      >
+        <Trash2 size={14} />
+      </button>
+
+      {/* Per-card teal progress bar — only while this panel is being tracked */}
+      {isAnalysing && trackingStartedAt !== null && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/[0.06]">
+          <div
+            className="h-full bg-[#00E5CC] transition-all duration-700 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ReportsPage ───────────────────────────────────────────────────────────────
+
 export function ReportsPage() {
   const { user } = useAuth();
   const { navigate } = useRouter();
+  const { state: progressState } = useReportProgress();
   const [panels, setPanels] = useState<PanelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -260,53 +347,19 @@ export function ReportsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(p => (
-            <div
-              key={p.id}
-              className="card p-5 flex items-center gap-4 hover:border-white/15 transition-all duration-200 group"
-            >
-              {/* Clickable content area */}
-              <div
-                className="flex-1 min-w-0 cursor-pointer flex items-center gap-4"
-                onClick={() => handleRowClick(p)}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-medium text-white">{p.lab_name || 'Blood Report'}</span>
-                    <StatusBadge status={p.processing_status} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#64748B]">
-                    {/* Upload date */}
-                    {(p.registered_at || p.created_at) && (
-                      <span>Uploaded: {formatDateTime(p.registered_at ?? p.created_at!)}</span>
-                    )}
-                    {/* Test / collection date */}
-                    <span>Test date: {formatTestDate(p.collected_on)}</span>
-                    {/* Bio age gap */}
-                    {p.bio_age_gap !== null && (
-                      <span className={`font-medium ${p.bio_age_gap <= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                        Bio age: {p.bio_age_gap <= 0 ? `${Math.abs(p.bio_age_gap)}y younger` : `${p.bio_age_gap}y older`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <BScoreDelta current={p.b_score} prev={p.b_score_prev} />
-                  <ArrowRight size={15} className="text-[#64748B] group-hover:text-white transition-colors" />
-                </div>
-              </div>
-
-              {/* Delete button — separate from row click */}
-              <button
-                onClick={e => { e.stopPropagation(); setDeleteTarget(p.id); }}
-                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                aria-label="Delete report"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+          {filtered.map(p => {
+            const isThisCardTracked =
+              progressState.phase === 'processing' && progressState.panelId === p.id;
+            return (
+              <PanelCard
+                key={p.id}
+                p={p}
+                trackingStartedAt={isThisCardTracked ? (progressState as { phase: 'processing'; panelId: string; startedAt: number }).startedAt : null}
+                onRowClick={handleRowClick}
+                onDelete={id => setDeleteTarget(id)}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -326,8 +379,7 @@ export function ReportsPage() {
 }
 
 function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString('en-IN', {
+  return new Date(iso).toLocaleString('en-IN', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, CheckCircle2, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Loader2 } from 'lucide-react';
 import { useReportProgress } from '../context/ReportProgressContext';
 import { useRouter } from '../hooks/useRouter';
 
 const AUTO_DISMISS_MS = 30_000;
 
-function useElapsedProgress(startedAt: number | null): number {
+export function useElapsedProgress(startedAt: number | null): number {
   const [pct, setPct] = useState(0);
 
   useEffect(() => {
@@ -30,14 +30,14 @@ function useElapsedProgress(startedAt: number | null): number {
 }
 
 export function AnalysisToastBar() {
-  const { state, dismiss, startTracking } = useReportProgress();
+  const { state, dismiss } = useReportProgress();
   const { navigate } = useRouter();
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startedAt = state.phase === 'processing' ? state.startedAt : null;
   const pct = useElapsedProgress(startedAt);
 
-  // Auto-dismiss on complete after 30s
+  // Auto-dismiss complete state after 30s
   useEffect(() => {
     if (state.phase === 'complete') {
       dismissTimerRef.current = setTimeout(dismiss, AUTO_DISMISS_MS);
@@ -52,31 +52,22 @@ export function AnalysisToastBar() {
   // ── Processing ──────────────────────────────────────────────────────────────
   if (state.phase === 'processing') {
     return (
-      <div className="w-full bg-[#0F2040] border-b border-[#00E5CC]/20 relative overflow-hidden">
-        {/* Animated progress fill */}
-        <div
-          className="absolute inset-0 bg-[#00E5CC]/[0.06] transition-all duration-700 ease-out origin-left"
-          style={{ transform: `scaleX(${pct / 100})` }}
-        />
-        <div className="relative max-w-screen-xl mx-auto px-4 lg:px-8 flex items-center justify-between h-9">
-          <div className="flex items-center gap-3">
-            {/* Pulsing dot */}
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00E5CC] opacity-60" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00E5CC]" />
-            </span>
-            <span className="text-xs font-medium text-[#94A3B8]">
-              Analysing your report
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-[#00E5CC]">{Math.round(pct)}%</span>
-            <div className="w-24 h-1 bg-white/[0.08] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#00E5CC] rounded-full transition-all duration-700 ease-out"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
+      <div className="fixed top-[calc(3.5rem+12px)] right-4 z-50 animate-fade-in">
+        <div className="flex items-center gap-2.5 bg-[#0F2040]/95 backdrop-blur-md border border-[#00E5CC]/25 rounded-full pl-3 pr-4 py-2 shadow-xl shadow-black/40 min-w-[180px]">
+          {/* Spinner */}
+          <Loader2 size={14} className="text-[#00E5CC] animate-spin flex-shrink-0" />
+          {/* Text */}
+          <span className="text-xs font-medium text-[#94A3B8] flex-1 whitespace-nowrap">Analyzing</span>
+          {/* Percentage */}
+          <span className="text-xs font-mono font-semibold text-[#00E5CC] tabular-nums">
+            {Math.round(pct)}%
+          </span>
+          {/* Mini progress arc */}
+          <div className="w-16 h-1 bg-white/[0.08] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#00E5CC] rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
       </div>
@@ -87,27 +78,19 @@ export function AnalysisToastBar() {
   if (state.phase === 'complete') {
     const { panelId } = state;
     return (
-      <div className="w-full bg-[#10B981]/10 border-b border-[#10B981]/30">
-        <div className="max-w-screen-xl mx-auto px-4 lg:px-8 flex items-center justify-between h-9">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 size={14} className="text-[#10B981] flex-shrink-0" />
-            <span className="text-xs font-medium text-[#10B981]">Report ready</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { dismiss(); navigate(`/reports/${panelId}`); }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#10B981] hover:text-white bg-[#10B981]/15 hover:bg-[#10B981]/25 px-3 py-1 rounded-lg transition-all duration-200"
-            >
-              <ExternalLink size={11} /> View report
-            </button>
-            <button
-              onClick={dismiss}
-              className="text-[#64748B] hover:text-white transition-colors p-1 rounded"
-              aria-label="Dismiss"
-            >
-              <X size={13} />
-            </button>
-          </div>
+      <div className="fixed top-[calc(3.5rem+12px)] right-4 z-50 animate-fade-in">
+        <div className="flex items-center gap-2 bg-[#0A2A1E]/95 backdrop-blur-md border border-[#10B981]/30 rounded-full pl-3 pr-2 py-1.5 shadow-xl shadow-black/40">
+          <CheckCircle2 size={13} className="text-[#10B981] flex-shrink-0" />
+          <span className="text-xs font-medium text-[#10B981] whitespace-nowrap">Report ready</span>
+          <button
+            onClick={() => { dismiss(); navigate(`/reports/${panelId}`); }}
+            className="flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/15 hover:bg-[#10B981]/25 px-2.5 py-1 rounded-full transition-all duration-200 ml-1"
+          >
+            <ExternalLink size={10} /> View
+          </button>
+          <button onClick={dismiss} className="text-[#64748B] hover:text-white transition-colors p-1 rounded-full" aria-label="Dismiss">
+            <X size={11} />
+          </button>
         </div>
       </div>
     );
@@ -115,29 +98,31 @@ export function AnalysisToastBar() {
 
   // ── Failed ───────────────────────────────────────────────────────────────────
   if (state.phase === 'failed') {
-    const { panelId, rawError } = state;
+    const { rawError } = state;
     return (
-      <div className="w-full bg-[#EF4444]/10 border-b border-[#EF4444]/25">
-        <div className="max-w-screen-xl mx-auto px-4 lg:px-8 flex items-center justify-between h-auto min-h-9 py-1.5 gap-3">
-          <div className="flex items-start gap-2.5 min-w-0">
-            <AlertCircle size={14} className="text-[#EF4444] flex-shrink-0 mt-0.5" />
-            <span className="text-xs font-medium text-[#EF4444] leading-tight">
-              Analysis failed: {rawError}
-            </span>
+      <div className="fixed top-[calc(3.5rem+12px)] right-4 z-50 animate-fade-in max-w-[280px]">
+        <div className="bg-[#2A0A0A]/95 backdrop-blur-md border border-[#EF4444]/30 rounded-2xl p-3 shadow-xl shadow-black/40">
+          {/* Top row */}
+          <div className="flex items-start gap-2 mb-2.5">
+            <AlertCircle size={13} className="text-[#EF4444] flex-shrink-0 mt-0.5" />
+            <p className="text-xs font-medium text-[#EF4444] leading-snug flex-1">{rawError}</p>
+            <button onClick={dismiss} className="text-[#64748B] hover:text-white transition-colors p-0.5 rounded flex-shrink-0" aria-label="Dismiss">
+              <X size={11} />
+            </button>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Action row */}
+          <div className="flex gap-2 pl-5">
             <button
               onClick={() => { dismiss(); navigate('/reports/upload'); }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#EF4444] hover:text-white bg-[#EF4444]/15 hover:bg-[#EF4444]/25 px-3 py-1 rounded-lg transition-all duration-200"
+              className="flex items-center gap-1.5 text-[10px] font-semibold text-[#EF4444] bg-[#EF4444]/15 hover:bg-[#EF4444]/25 px-2.5 py-1 rounded-full transition-all duration-200"
             >
-              <RefreshCw size={11} /> Retry
+              <RefreshCw size={9} /> Retry
             </button>
             <button
               onClick={dismiss}
-              className="text-[#64748B] hover:text-white transition-colors p-1 rounded"
-              aria-label="Dismiss"
+              className="text-[10px] font-medium text-[#64748B] hover:text-white px-2.5 py-1 rounded-full transition-colors"
             >
-              <X size={13} />
+              Dismiss
             </button>
           </div>
         </div>
