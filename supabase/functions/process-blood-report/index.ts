@@ -1258,6 +1258,15 @@ Deno.serve(async (req: Request) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
+    // Abort the Claude fetch after 4 minutes — fires before the platform kills the
+    // process ungracefully, giving the outer catch a chance to write 'failed' status.
+    const TIMEOUT_MS = 4 * 60 * 1000;
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(
+      () => abortController.abort(new Error("Analysis exceeded 4-minute limit")),
+      TIMEOUT_MS
+    );
+
     const messages: any[] = base64PDF
       ? [{
           role: "user",
@@ -1268,20 +1277,26 @@ Deno.serve(async (req: Request) => {
         }]
       : [{ role: "user", content: "No PDF provided." }];
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 16000,
-        system: SYSTEM_PROMPT,
-        messages,
-      }),
-    });
+    let claudeRes: Response;
+    try {
+      claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 16000,
+          system: SYSTEM_PROMPT,
+          messages,
+        }),
+        signal: abortController.signal,
+      });
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
 
     if (!claudeRes.ok) throw new Error("Claude API error: " + (await claudeRes.text()));
 

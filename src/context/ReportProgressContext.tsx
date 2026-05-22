@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -21,6 +21,7 @@ const Ctx = createContext<ContextType>({
 });
 
 const STORAGE_KEY = 'zenoho_analysis_panel_id';
+const WATCHDOG_MS = 5 * 60 * 1000; // 5 minutes
 
 function mapErrorToFriendly(raw: string): string {
   if (!raw) return 'Something went wrong. Please try again.';
@@ -31,7 +32,7 @@ function mapErrorToFriendly(raw: string): string {
   if (r.includes('check constraint') || r.includes('violates')) {
     return 'Report data unexpected. Please contact support.';
   }
-  if (r.includes('timeout') || r.includes('timed out')) {
+  if (r.includes('timeout') || r.includes('timed out') || r.includes('4-minute')) {
     return 'Analysis took too long. Please try again.';
   }
   if (r.includes('not_found_error') || r.includes('model')) {
@@ -44,9 +45,48 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [state, setState] = useState<AnalysisState>({ phase: 'idle' });
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearWatchdog() {
+    if (watchdogRef.current) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+  }
+
+  // Arm the 5-minute watchdog. Respects elapsed time so page-reload resumes
+  // correctly rather than resetting the clock.
+  const armWatchdog = useCallback((panelId: string, startedAt: number) => {
+    clearWatchdog();
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(WATCHDOG_MS - elapsed, 0);
+
+    watchdogRef.current = setTimeout(async () => {
+      // Re-check DB status before writing — avoid stomping a completed panel
+      const { data } = await supabase
+        .from('panels')
+        .select('processing_status')
+        .eq('id', panelId)
+        .maybeSingle();
+
+      if (data?.processing_status === 'processing' || data?.processing_status === 'pending') {
+        await supabase.from('panels').update({
+          processing_status: 'failed',
+          processing_error: 'Analysis took longer than expected. Please try again.',
+        }).eq('id', panelId);
+        // The realtime subscription picks up the DB change and morphs state to 'failed'.
+        // Clean up here in case realtime is slow.
+        localStorage.removeItem(STORAGE_KEY);
+        clearWatchdog();
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      }
+    }, remaining);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function subscribe(panelId: string, startedAt: number) {
-    // Unsubscribe any previous channel
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -65,10 +105,12 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
         (payload) => {
           const row = payload.new as { processing_status: string; processing_error: string | null };
           if (row.processing_status === 'complete') {
+            clearWatchdog();
             setState({ phase: 'complete', panelId });
             localStorage.removeItem(STORAGE_KEY);
             supabase.removeChannel(ch);
           } else if (row.processing_status === 'failed') {
+            clearWatchdog();
             setState({
               phase: 'failed',
               panelId,
@@ -84,6 +126,7 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
 
     channelRef.current = ch;
     setState({ phase: 'processing', panelId, startedAt });
+    armWatchdog(panelId, startedAt);
   }
 
   function startTracking(panelId: string) {
@@ -94,6 +137,7 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
 
   function dismiss() {
     localStorage.removeItem(STORAGE_KEY);
+    clearWatchdog();
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -117,7 +161,6 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
 
     const { panelId, startedAt } = parsed;
 
-    // Check current status before subscribing
     supabase
       .from('panels')
       .select('processing_status, processing_error')
@@ -140,12 +183,13 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
           });
           localStorage.removeItem(STORAGE_KEY);
         } else {
-          // Still in flight — subscribe for realtime updates
+          // Still in flight — subscribe and arm watchdog (elapsed time accounted for)
           subscribe(panelId, startedAt);
         }
       });
 
     return () => {
+      clearWatchdog();
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
