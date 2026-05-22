@@ -109,6 +109,8 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
             setState({ phase: 'complete', panelId });
             localStorage.removeItem(STORAGE_KEY);
             supabase.removeChannel(ch);
+          } else if (row.processing_status === 'text_extracted' || row.processing_status === 'analyzing') {
+            // Intermediate pipeline states — stay in 'processing' UI, keep pill visible
           } else if (row.processing_status === 'failed') {
             clearWatchdog();
             setState({

@@ -53,22 +53,27 @@ export function AnalysisToastBar() {
   if (state.phase === 'processing') {
     return (
       <div className="fixed top-[calc(3.5rem+12px)] right-4 z-50 animate-fade-in">
-        <div className="flex items-center gap-2.5 bg-[#0F2040]/95 backdrop-blur-md border border-[#00E5CC]/25 rounded-full pl-3 pr-4 py-2 shadow-xl shadow-black/40 min-w-[180px]">
-          {/* Spinner */}
-          <Loader2 size={14} className="text-[#00E5CC] animate-spin flex-shrink-0" />
-          {/* Text */}
-          <span className="text-xs font-medium text-[#94A3B8] flex-1 whitespace-nowrap">Analyzing</span>
-          {/* Percentage */}
-          <span className="text-xs font-mono font-semibold text-[#00E5CC] tabular-nums">
-            {Math.round(pct)}%
-          </span>
-          {/* Mini progress arc */}
-          <div className="w-16 h-1 bg-white/[0.08] rounded-full overflow-hidden">
+        <div className="flex flex-col gap-1.5 bg-[#0F2040]/95 backdrop-blur-md border border-[#00E5CC]/25 rounded-2xl pl-3 pr-4 py-2.5 shadow-xl shadow-black/40 min-w-[220px]">
+          {/* Top row */}
+          <div className="flex items-center gap-2.5">
+            {/* Spinner */}
+            <Loader2 size={14} className="text-[#00E5CC] animate-spin flex-shrink-0" />
+            {/* Text */}
+            <span className="text-xs font-medium text-[#94A3B8] flex-1 whitespace-nowrap">Analyzing</span>
+            {/* Percentage */}
+            <span className="text-xs font-mono font-semibold text-[#00E5CC] tabular-nums">
+              {Math.round(pct)}%
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden">
             <div
               className="h-full bg-[#00E5CC] rounded-full transition-all duration-700 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>
+          {/* Helper text */}
+          <span className="text-[10px] text-[#475569] leading-none">Usually takes 1-3 minutes. Runs in background.</span>
         </div>
       </div>
     );
