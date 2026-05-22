@@ -81,7 +81,7 @@ export function ReportProcessingPage({ panelId }: { panelId: string }) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${supabaseUrl}/functions/v1/process-blood-report`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/extract-pdf-text`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

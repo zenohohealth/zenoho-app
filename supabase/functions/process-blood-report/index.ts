@@ -1237,45 +1237,31 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    await supabase.from("panels").update({ processing_status: "processing" }).eq("id", panel_id);
+    await supabase.from("panels").update({ processing_status: "analyzing" }).eq("id", panel_id);
 
     const { data: panel, error: panelErr } = await supabase
       .from("panels").select("*").eq("id", panel_id).single();
     if (panelErr || !panel) throw new Error("Panel not found: " + (panelErr?.message ?? "unknown"));
 
-    let base64PDF: string | null = null;
-    if (panel.raw_pdf_path) {
-      const { data: fileData, error: storageErr } = await supabase.storage
-        .from("blood-reports").download(panel.raw_pdf_path);
-      if (storageErr || !fileData) throw new Error("Storage download failed: " + (storageErr?.message ?? "no data"));
-      const arrayBuf = await fileData.arrayBuffer();
-      const uint8 = new Uint8Array(arrayBuf);
-      let binary = "";
-      for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-      base64PDF = btoa(binary);
-    }
+    const rawText: string = panel.raw_text ?? "";
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-    // Abort the Claude fetch after 4 minutes — fires before the platform kills the
-    // process ungracefully, giving the outer catch a chance to write 'failed' status.
-    const TIMEOUT_MS = 4 * 60 * 1000;
+    // 140s abort — fires before Pro's 150s platform wall-clock kill,
+    // giving the outer catch a chance to write 'failed' status.
+    const TIMEOUT_MS = 140_000;
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(
-      () => abortController.abort(new Error("Analysis exceeded 4-minute limit")),
+      () => abortController.abort(new Error("Analysis exceeded 140-second limit")),
       TIMEOUT_MS
     );
 
-    const messages: any[] = base64PDF
-      ? [{
-          role: "user",
-          content: [
-            { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64PDF } },
-            { type: "text", text: "Analyse this blood report. Return JSON only." },
-          ],
-        }]
-      : [{ role: "user", content: "No PDF provided." }];
+    const userMessage = rawText
+      ? `Analyse this blood report extracted from PDF. Return JSON only.\n\n${rawText}`
+      : "No report text available.";
+
+    const messages: any[] = [{ role: "user", content: userMessage }];
 
     let claudeRes: Response;
     try {
@@ -1288,7 +1274,7 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 16000,
+          max_tokens: 8192,
           system: SYSTEM_PROMPT,
           messages,
         }),
