@@ -1246,7 +1246,7 @@ Deno.serve(async (req: Request) => {
     await supabase.from("panels").update({ processing_status: "analyzing" }).eq("id", panel.id);
     console.log("[process-blood-report] Status set to analyzing for panel:", panel.id);
 
-    const rawText: string = panel.raw_text ?? "";
+    const panelRawText: string = panel.raw_text ?? "";
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -1260,8 +1260,8 @@ Deno.serve(async (req: Request) => {
       TIMEOUT_MS
     );
 
-    const userMessage = rawText
-      ? `Analyse this blood report extracted from PDF. Return JSON only.\n\n${rawText}`
+    const userMessage = panelRawText
+      ? `Analyse this blood report extracted from PDF. Return JSON only.\n\n${panelRawText}`
       : "No report text available.";
 
     const messages: any[] = [{ role: "user", content: userMessage }];
