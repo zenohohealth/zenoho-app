@@ -1243,6 +1243,9 @@ Deno.serve(async (req: Request) => {
       .from("panels").select("*").eq("id", panel_id).single();
     if (panelErr || !panel) throw new Error("Panel not found: " + (panelErr?.message ?? "unknown"));
 
+    await supabase.from("panels").update({ processing_status: "analyzing" }).eq("id", panel.id);
+    console.log("[process-blood-report] Status set to analyzing for panel:", panel.id);
+
     const rawText: string = panel.raw_text ?? "";
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
