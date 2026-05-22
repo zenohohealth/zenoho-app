@@ -15,6 +15,7 @@ import { BillingPage } from './pages/BillingPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { AdminPage } from './pages/AdminPage';
+import { AdminTestPipelinePage } from './pages/AdminTestPipelinePage';
 import { DebugPage } from './pages/DebugPage';
 import { TopNav } from './components/TopNav';
 import { AnalysisToastBar } from './components/AnalysisToastBar';
@@ -56,6 +57,7 @@ function AppShell() {
     if (route === '/settings') return <SettingsPage />;
     if (route === '/community') return <CommunityPage />;
     if (route === '/admin') return <AdminPage />;
+    if (route === '/admin/test-pipeline') return <AdminTestPipelinePage />;
     return <DashboardPage />;
   };
 
