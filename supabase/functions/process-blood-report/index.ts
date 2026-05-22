@@ -1260,8 +1260,10 @@ Deno.serve(async (req: Request) => {
       TIMEOUT_MS
     );
 
+    const conciseness = `\n\n---\nOUTPUT FORMAT CONSTRAINT (CRITICAL — read carefully):\nYour JSON response MUST fit within 8000 output tokens. The Edge Function will time out if you exceed this. To achieve this:\n1. Limit each marker's "interpretation" field to ONE short sentence, maximum 20 words.\n2. Limit each supplement_recommendation's "rationale" field to ONE short sentence, maximum 25 words.\n3. Do NOT repeat the SaMD disclaimer or wellness disclaimer inside individual markers — disclaimers belong ONLY at the top level of the JSON (disclaimer_header and disclaimer_footer fields).\n4. For markers within the normal/optimal range, keep the interpretation extremely brief (e.g., "Within optimal range." or similar).\n5. Maintain all required schema fields and clinical accuracy. Only the prose fields should be terse.\nFailure to fit within 8000 output tokens will cause truncation and parse failure. Be concise.\n---`;
+
     const userMessage = panelRawText
-      ? `Analyse this blood report extracted from PDF. Return JSON only.\n\n${panelRawText}`
+      ? `Analyse this blood report extracted from PDF. Return JSON only.\n\n${panelRawText}${conciseness}`
       : "No report text available.";
 
     const messages: any[] = [{ role: "user", content: userMessage }];
