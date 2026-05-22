@@ -1251,12 +1251,12 @@ Deno.serve(async (req: Request) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-    // 140s abort — fires before Pro's 150s platform wall-clock kill,
+    // 148s abort — fires before Pro's 150s platform wall-clock kill,
     // giving the outer catch a chance to write 'failed' status.
-    const TIMEOUT_MS = 140_000;
+    const TIMEOUT_MS = 148_000;
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(
-      () => abortController.abort(new Error("Analysis exceeded 140-second limit")),
+      () => abortController.abort(new Error("Analysis exceeded 148-second limit")),
       TIMEOUT_MS
     );
 
