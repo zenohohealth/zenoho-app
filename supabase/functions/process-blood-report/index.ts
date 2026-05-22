@@ -1278,7 +1278,13 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
           max_tokens: 16384,
-          system: SYSTEM_PROMPT,
+          system: [
+            {
+              type: "text",
+              text: SYSTEM_PROMPT,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
           messages,
         }),
         signal: abortController.signal,
@@ -1290,6 +1296,7 @@ Deno.serve(async (req: Request) => {
     if (!claudeRes.ok) throw new Error("Claude API error: " + (await claudeRes.text()));
 
     const claudeData = await claudeRes.json();
+    console.log('[process-blood-report] Cache stats:', JSON.stringify(claudeData.usage));
     let rawText: string = (claudeData.content?.[0]?.text ?? "").trim();
     if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json\s*/, "").replace(/\s*```\s*$/, "");
     else if (rawText.startsWith("```")) rawText = rawText.replace(/^```\s*/, "").replace(/\s*```\s*$/, "");
