@@ -180,48 +180,47 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
     setState({ phase: 'idle' });
   }
 
-  // On mount: restore any in-flight panel from localStorage and check its current status
+  // On mount: query DB as source of truth — never trust localStorage alone.
+  // localStorage is used only to recover the startedAt timestamp for elapsed-progress display.
   useEffect(() => {
     if (!user) return;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
 
-    let parsed: { panelId: string; startedAt: number };
-    try {
-      parsed = JSON.parse(saved);
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-      return;
-    }
+    (async () => {
+      // 1. Ask the DB: does this user have any panel that is genuinely in-flight?
+      const { data: inFlight } = await supabase
+        .from('panels')
+        .select('id, processing_status, processing_error')
+        .eq('user_id', user.id)
+        .not('processing_status', 'in', '(complete,failed)')
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    const { panelId, startedAt } = parsed;
+      // 2. No in-flight panel → clear any stale localStorage and stay idle.
+      if (!inFlight || inFlight.length === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+        setState({ phase: 'idle' });
+        return;
+      }
 
-    supabase
-      .from('panels')
-      .select('processing_status, processing_error')
-      .eq('id', panelId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) {
-          localStorage.removeItem(STORAGE_KEY);
-          return;
+      // 3. There IS a real in-flight panel — recover startedAt from localStorage if available.
+      const panel = inFlight[0];
+      let startedAt = Date.now();
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.panelId === panel.id && typeof parsed.startedAt === 'number') {
+            startedAt = parsed.startedAt;
+          }
+        } catch {
+          // ignore malformed cache
         }
-        if (data.processing_status === 'complete') {
-          setState({ phase: 'complete', panelId });
-          localStorage.removeItem(STORAGE_KEY);
-        } else if (data.processing_status === 'failed') {
-          setState({
-            phase: 'failed',
-            panelId,
-            rawError: mapErrorToFriendly(data.processing_error ?? ''),
-          });
-          localStorage.removeItem(STORAGE_KEY);
-        } else {
-          // Still in flight — subscribe and arm watchdog (elapsed time accounted for)
-          subscribe(panelId, startedAt);
-        }
-      });
+      }
+
+      // 4. Re-persist with correct panelId (in case cache had a different id)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ panelId: panel.id, startedAt }));
+      subscribe(panel.id, startedAt);
+    })();
 
     return () => {
       clearWatchdog();
