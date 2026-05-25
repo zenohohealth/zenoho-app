@@ -8,6 +8,7 @@ import { useRouter } from '../hooks/useRouter';
 type Panel = {
   id: string;
   lab_name: string | null;
+  patient_name_on_report: string | null;
   collected_on: string;
   processing_status: string;
 };
@@ -117,6 +118,13 @@ const ZONE_LABELS: Record<string, string> = {
 
 function ConfidenceBadge({ level }: { level: string | null }) {
   if (!level) return null;
+  if (level === 'INSUFFICIENT_COVERAGE') {
+    return (
+      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium text-[#F59E0B] bg-[#F59E0B]/10">
+        Insufficient coverage — retest recommended
+      </span>
+    );
+  }
   const cls = level === 'HIGH' ? 'text-[#10B981] bg-[#10B981]/10' :
               level === 'MEDIUM' ? 'text-[#F59E0B] bg-[#F59E0B]/10' :
               'text-[#64748B] bg-white/[0.06]';
@@ -328,7 +336,10 @@ function TabDomains({ domains, markers, safetyActive }: { domains: DomainScore[]
             <div key={d.domain_id} className="card p-4 flex items-center gap-3">
               <span className="text-lg">{DOMAIN_ICONS[d.domain_name] ?? '•'}</span>
               <span className="text-sm font-medium text-white">{d.domain_name}</span>
-              <span className="text-xs text-[#F59E0B] bg-[#F59E0B]/10 px-2 py-0.5 rounded-full ml-auto">Pending physician review</span>
+              {d.confidence === 'INSUFFICIENT_COVERAGE'
+                ? <span className="text-xs text-[#F59E0B] bg-[#F59E0B]/10 px-2 py-0.5 rounded-full ml-auto">Insufficient coverage — retest recommended</span>
+                : <span className="text-xs text-[#F59E0B] bg-[#F59E0B]/10 px-2 py-0.5 rounded-full ml-auto">Pending physician review</span>
+              }
             </div>
           )
           : <DomainExpanded key={d.domain_id} d={d} markers={markers.filter(m => {
@@ -579,7 +590,7 @@ export function ReportDetailPage({ panelId }: { panelId: string }) {
   useEffect(() => {
     async function load() {
       const [{ data: p }, { data: score }, { data: doms }, { data: marks }, { data: sups }] = await Promise.all([
-        supabase.from('panels').select('id, lab_name, collected_on, processing_status').eq('id', panelId).maybeSingle(),
+        supabase.from('panels').select('id, lab_name, patient_name_on_report, collected_on, processing_status').eq('id', panelId).maybeSingle(),
         supabase.from('panel_scores').select('*').eq('panel_id', panelId).maybeSingle(),
         supabase.from('domain_scores').select('*').eq('panel_id', panelId).order('domain_id'),
         supabase.from('marker_results').select('*').eq('panel_id', panelId).order('marker_id'),
@@ -626,7 +637,7 @@ export function ReportDetailPage({ panelId }: { panelId: string }) {
       {/* Header */}
       <div className="px-6 lg:px-8 pt-6 pb-0">
         <button onClick={() => navigate('/reports')} className="btn-ghost flex items-center gap-2 text-sm mb-4">
-          <ArrowLeft size={14} /> All Reports
+          <ArrowLeft size={14} /> Back to My Reports
         </button>
 
         {/* Failed banner */}
@@ -650,7 +661,13 @@ export function ReportDetailPage({ panelId }: { panelId: string }) {
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h1 className="text-xl font-bold text-white">{panel.lab_name || 'Blood Report'}</h1>
-            <p className="text-[#94A3B8] text-sm mt-0.5">{formatDate(panel.collected_on)}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {panel.patient_name_on_report && (
+                <span className="text-sm font-medium text-[#94A3B8]">{panel.patient_name_on_report}</span>
+              )}
+              {panel.patient_name_on_report && <span className="text-[#334155]">·</span>}
+              <span className="text-[#64748B] text-sm">{formatDate(panel.collected_on)}</span>
+            </div>
           </div>
           {panel.processing_status !== 'complete' && (
             <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${

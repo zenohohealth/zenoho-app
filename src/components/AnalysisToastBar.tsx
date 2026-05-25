@@ -73,7 +73,7 @@ export function AnalysisToastBar() {
             />
           </div>
           {/* Helper text */}
-          <span className="text-[10px] text-[#475569] leading-none">Usually takes 1-3 minutes. Runs in background.</span>
+          <span className="text-[10px] text-[#475569] leading-none">Usually takes 4-6 minutes — runs in background.</span>
         </div>
       </div>
     );

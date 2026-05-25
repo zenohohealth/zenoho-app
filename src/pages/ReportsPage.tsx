@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Upload, ArrowRight, Clock, CheckCircle2, AlertCircle,
-  TrendingUp, TrendingDown, Search, Trash2, X, Loader2,
+  Search, Trash2, X, Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -12,12 +12,12 @@ import { useElapsedProgress } from '../components/AnalysisToastBar';
 type PanelRow = {
   id: string;
   lab_name: string | null;
+  patient_name_on_report: string | null;
   collected_on: string;
   registered_at: string | null;
   created_at: string | null;
   processing_status: string;
   b_score: number | null;
-  b_score_prev: number | null;
   bio_age_gap: number | null;
 };
 
@@ -42,20 +42,13 @@ function StatusBadge({ status, pct }: { status: string; pct?: number }) {
   );
 }
 
-// ── BScoreDelta ───────────────────────────────────────────────────────────────
+// ── BScoreDisplay ─────────────────────────────────────────────────────────────
 
-function BScoreDelta({ current, prev }: { current: number | null; prev: number | null }) {
+function BScoreDisplay({ current }: { current: number | null }) {
   if (current === null) return null;
-  const delta = prev !== null ? current - prev : null;
   return (
     <div className="text-right">
       <div className="font-mono font-bold text-lg text-white">{current.toFixed(1)}</div>
-      {delta !== null && Math.abs(delta) >= 0.1 && (
-        <div className={`flex items-center gap-0.5 justify-end text-xs font-medium ${delta > 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-          {delta > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-          {delta > 0 ? '+' : ''}{delta.toFixed(1)}
-        </div>
-      )}
       <div className="text-[10px] text-[#64748B]">B-Score</div>
     </div>
   );
@@ -169,13 +162,16 @@ function PanelCard({
         onClick={() => onRowClick(p)}
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <span className="font-medium text-white">{p.lab_name || 'Blood Report'}</span>
             <StatusBadge
               status={p.processing_status}
               pct={isAnalysing && trackingStartedAt !== null ? pct : undefined}
             />
           </div>
+          {p.patient_name_on_report && (
+            <div className="text-xs text-[#94A3B8] font-medium mb-0.5">{p.patient_name_on_report}</div>
+          )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#64748B]">
             {(p.registered_at || p.created_at) && (
               <span>Uploaded: {formatDateTime(p.registered_at ?? p.created_at!)}</span>
@@ -190,7 +186,7 @@ function PanelCard({
         </div>
 
         <div className="flex items-center gap-4 flex-shrink-0">
-          <BScoreDelta current={p.b_score} prev={p.b_score_prev} />
+          <BScoreDisplay current={p.b_score} />
           <ArrowRight size={15} className="text-[#64748B] group-hover:text-white transition-colors" />
         </div>
       </div>
@@ -234,33 +230,22 @@ export function ReportsPage() {
     if (!user) return;
     const { data } = await supabase
       .from('panels')
-      .select('id, lab_name, collected_on, registered_at, created_at, processing_status')
+      .select('id, lab_name, patient_name_on_report, collected_on, registered_at, created_at, processing_status')
       .eq('user_id', user.id)
       .order('registered_at', { ascending: false, nullsFirst: false });
 
     if (data) {
       const enriched: PanelRow[] = await Promise.all(
-        data.map(async (p, idx) => {
+        data.map(async (p) => {
           const { data: sc } = await supabase
             .from('panel_scores')
             .select('b_score, bio_age_gap')
             .eq('panel_id', p.id)
             .maybeSingle();
 
-          let b_score_prev: number | null = null;
-          if (idx < data.length - 1) {
-            const { data: prevSc } = await supabase
-              .from('panel_scores')
-              .select('b_score')
-              .eq('panel_id', data[idx + 1].id)
-              .maybeSingle();
-            b_score_prev = prevSc?.b_score ?? null;
-          }
-
           return {
             ...p,
             b_score: sc?.b_score ?? null,
-            b_score_prev,
             bio_age_gap: sc?.bio_age_gap ?? null,
           };
         })

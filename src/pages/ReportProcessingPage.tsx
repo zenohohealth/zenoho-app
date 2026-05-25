@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { X, Loader2, Clock } from 'lucide-react';
+import { X, Loader2, Clock, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from '../hooks/useRouter';
 import { Logo } from '../components/Logo';
@@ -13,7 +13,7 @@ const STATUS_MESSAGES = [
 ];
 
 const POLL_INTERVAL_MS = 3000;
-const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+const TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes (pipeline can take 4-6 min)
 
 // ─── B-Score Count-up Screen ──────────────────────────────────────────────────
 
@@ -175,10 +175,20 @@ export function ReportProcessingPage({ panelId }: { panelId: string }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#0D1B35] flex flex-col items-center justify-center z-50">
+    <div className="fixed inset-0 bg-[#0D1B35] flex flex-col z-50">
+      {/* Back button — top-left */}
+      <div className="absolute top-4 left-4 z-10">
+        <button
+          onClick={() => navigate('/reports')}
+          className="flex items-center gap-1.5 text-sm text-[#64748B] hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.06]"
+        >
+          <ArrowLeft size={14} /> My Reports
+        </button>
+      </div>
+
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#00E5CC]/[0.04] blur-[120px] pointer-events-none" />
 
-      <div className="relative z-10 flex flex-col items-center text-center max-w-sm px-6">
+      <div className="relative z-10 flex flex-col items-center justify-center flex-1 text-center max-w-sm px-6 mx-auto">
         <div className="mb-10" style={{ animation: 'pulse 2s ease-in-out infinite' }}>
           <Logo size="lg" />
         </div>
@@ -233,7 +243,7 @@ export function ReportProcessingPage({ panelId }: { panelId: string }) {
               {STATUS_MESSAGES[msgIdx]}{dots}
             </p>
             <p className="text-[#64748B] text-sm leading-relaxed">
-              Usually takes 30–60 seconds. Please don't close this tab.
+              Usually takes 4–6 minutes — runs in background.
             </p>
           </>
         )}

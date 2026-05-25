@@ -46,11 +46,19 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AnalysisState>({ phase: 'idle' });
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function clearWatchdog() {
     if (watchdogRef.current) {
       clearTimeout(watchdogRef.current);
       watchdogRef.current = null;
+    }
+  }
+
+  function clearPoll() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
     }
   }
 
@@ -129,6 +137,30 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
     channelRef.current = ch;
     setState({ phase: 'processing', panelId, startedAt });
     armWatchdog(panelId, startedAt);
+
+    // Polling fallback: if realtime misses the final status transition, catch it by polling every 8s
+    clearPoll();
+    pollRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('panels')
+        .select('processing_status, processing_error')
+        .eq('id', panelId)
+        .maybeSingle();
+      if (!data) return;
+      if (data.processing_status === 'complete') {
+        clearWatchdog();
+        clearPoll();
+        setState({ phase: 'complete', panelId });
+        localStorage.removeItem(STORAGE_KEY);
+        if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+      } else if (data.processing_status === 'failed') {
+        clearWatchdog();
+        clearPoll();
+        setState({ phase: 'failed', panelId, rawError: mapErrorToFriendly(data.processing_error ?? '') });
+        localStorage.removeItem(STORAGE_KEY);
+        if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+      }
+    }, 8_000);
   }
 
   function startTracking(panelId: string) {
@@ -140,6 +172,7 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
   function dismiss() {
     localStorage.removeItem(STORAGE_KEY);
     clearWatchdog();
+    clearPoll();
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -192,6 +225,7 @@ export function ReportProgressProvider({ children }: { children: ReactNode }) {
 
     return () => {
       clearWatchdog();
+      clearPoll();
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
